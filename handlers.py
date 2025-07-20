@@ -8,7 +8,16 @@ from aiogram.types import (
     Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
 from aiogram.filters import Command, CommandStart
-from config import MAIN_CHANNEL_ID, MODEL_CHANNEL_MAP, ALWAYS_SEND_TO, CHANNEL_NAMES
+
+# Config dan import qilish (xavfsiz versiya)
+from config import (
+    MAIN_CHANNEL_ID, 
+    MODEL_CHANNEL_MAP, 
+    ALWAYS_SEND_TO, 
+    CHANNEL_NAMES,
+    BOT_OWNER_ID,  # config.py dan import - hard-code emas!
+    BOT_VERSION
+)
 
 router = Router()
 logging.basicConfig(level=logging.INFO)
@@ -17,11 +26,8 @@ MAPPING_FILE = "mapping.json"
 # Admin config fayllar
 ADMIN_CONFIG_FILE = "admin_config.json"
 MODEL_KEYWORDS_FILE = "model_keywords.json"
-REGION_KEYWORDS_FILE = "region_keywords.json"  # Yangi - viloyat kalit so'zlari
+REGION_KEYWORDS_FILE = "region_keywords.json"
 ADMIN_USERS_FILE = "admin_users.json"
-
-# Bot owner ID - botning asosiy egasi (o'zgartiring!)
-BOT_OWNER_ID = 7722000515  # User ID o'zgartirildi
 
 # Global lock for file operations
 file_lock = asyncio.Lock()
@@ -63,7 +69,8 @@ async def load_model_keywords():
             "damas": ["damas", "дамас", "#damas", "#дамас"],
             "jentra": ["jentra", "жентра", "#jentra", "#жентра", "gentra", "#gentra"],
             "malibu": ["malibu", "малибу", "#malibu", "#малибу"],
-            "spark": ["spark", "спарк", "#spark", "#спарк"]
+            "spark": ["spark", "спарк", "#spark", "#спарк"],
+            "nexia": ["nexia", "нексия", "#nexia", "#нексия"]
         }
         await save_model_keywords(default_keywords)
         return default_keywords
@@ -116,6 +123,7 @@ async def detect_region(text: str) -> str | None:
             if keyword.lower() in text:
                 return region
     return None
+
 async def detect_model_advanced(text: str) -> str | None:
     """Yangi model detection - keywords asosida"""
     if not text:
@@ -1122,13 +1130,15 @@ async def cmd_owner_info(msg: Message, bot):
         text += f"📝 <b>Ism:</b> {owner_name}\n"
         text += f"🔗 <b>Username:</b> {owner_username}\n"
         text += f"🆔 <b>ID:</b> <code>{BOT_OWNER_ID}</code>\n"
-        text += f"🛡️ <b>Huquq:</b> To'liq (Owner)\n\n"
-        text += f"ℹ️ Bot egasi har doim barcha funksiyalardan foydalanishi mumkin."
+        text += f"🛡️ <b>Huquq:</b> To'liq (Owner)\n"
+        text += f"📊 <b>Bot versiya:</b> {BOT_VERSION}\n\n"
+        text += f"ℹ️ Owner ma'lumotlari .env fayldan yuklanadi."
         
         await msg.answer(text)
-    except:
+    except Exception as e:
         await msg.answer(f"👑 <b>Bot egasi ID:</b> <code>{BOT_OWNER_ID}</code>\n\n"
-                        f"🛡️ Bot egasi har doim to'liq huquqga ega.")
+                        f"🛡️ Bot egasi har doim to'liq huquqga ega.\n"
+                        f"⚠️ Ma'lumot olishda xato: {e}")
 
 # Viloyat qo'shish
 @router.message(Command("add_region"))
@@ -1473,6 +1483,7 @@ async def cmd_toggle_channel_admins(msg: Message, bot):
     new_status = "Yoqildi ✅" if not current_status else "O'chirildi ❌"
     await msg.answer(f"🔄 Kanal adminlari: {new_status}\n\n"
                     f"Agar kanal adminlari o'chirilsa, faqat qo'shimcha adminlar botdan foydalanishi mumkin.")
+
 @router.message(Command("remove_always"))
 async def cmd_remove_always(msg: Message, bot):
     """Umumiy kanalni o'chirish: /remove_always <kanal_id>"""
@@ -1631,6 +1642,7 @@ async def admin_stats_menu(callback: CallbackQuery):
         text += f"📢 <b>Umumiy kanallar:</b> {always_count} ta\n\n"
         text += f"🔤 <b>Model kalit so'zlari:</b> {total_model_keywords} ta\n"
         text += f"🗺️ <b>Viloyat kalit so'zlari:</b> {total_region_keywords} ta\n"
+        text += f"📊 <b>Bot versiya:</b> {BOT_VERSION}"
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔙 Orqaga", callback_data="admin_back")]
@@ -1686,7 +1698,7 @@ async def start_command(msg: Message, bot):
     if not await is_admin(msg.from_user.id, bot):
         return  # Javob bermaydi
     
-    text = """👋 Salom! Men avtomatik repost botman.
+    text = f"""👋 Salom! Men avtomatik repost botman.
 
 📝 Asosiy kanalga e'lon tashlansa, tegishli kanallarga yuboraman.
 ✉️ Reply xabaringizni ham tarqataman.
@@ -1694,7 +1706,10 @@ async def start_command(msg: Message, bot):
 🗑 Forward qilsangiz — o'chirish tugmasi chiqaraman.
 📅 Mapping 45 kun saqlanadi.
 
-🎛️ Admin panel: /admin"""
+🎛️ Admin panel: /admin
+📊 Versiya: {BOT_VERSION}
+
+🛡️ Xavfsizlik: Barcha muhim ma'lumotlar .env faylda saqlangan."""
     
     await msg.answer(text, parse_mode=None)
 
@@ -1708,6 +1723,8 @@ async def cmd_status(msg: Message, bot):
     config = await get_current_config()
     all_channels = set(config["always_send_to"])
     for ch_list in config["model_channels"].values():
+        all_channels.update(ch_list)
+    for ch_list in config["region_channels"].values():
         all_channels.update(ch_list)
     all_channels.add(MAIN_CHANNEL_ID)
 
@@ -1724,6 +1741,7 @@ async def cmd_status(msg: Message, bot):
         report += f"📌 {name} → {status}\n"
 
     await msg.answer(report)
+
 # /del komandasi - yangi
 @router.message(Command("del"))
 async def cmd_delete_post(msg: Message, bot):
@@ -1751,14 +1769,14 @@ async def cmd_delete_post(msg: Message, bot):
     post_mapping = mapping[post_id]
     deleted_count = 0
 
-    # 1️⃣ Asosiy kanaldagi postni o‘chirish
+    # 1️⃣ Asosiy kanaldagi postni o'chirish
     try:
         await bot.delete_message(MAIN_CHANNEL_ID, int(post_id))
         deleted_count += 1
     except Exception as e:
-        logging.error(f"❌ Asosiy postni o‘chirishda xato: {e}")
+        logging.error(f"❌ Asosiy postni o'chirishda xato: {e}")
 
-    # 2️⃣ Nusxalarni o‘chirish
+    # 2️⃣ Nusxalarni o'chirish
     if isinstance(post_mapping, dict) and "reply_to" in post_mapping:
         # Reply xabarlar
         targets = post_mapping.get("targets", {})
@@ -1767,7 +1785,7 @@ async def cmd_delete_post(msg: Message, bot):
                 await bot.delete_message(int(chat_id_str), msg_id)
                 deleted_count += 1
             except Exception as e:
-                logging.error(f"❌ Reply nusxasini o‘chirishda xato: {e}")
+                logging.error(f"❌ Reply nusxasini o'chirishda xato: {e}")
     else:
         # Oddiy postlar
         for chat_id_str, msg_id in post_mapping.items():
@@ -1777,12 +1795,37 @@ async def cmd_delete_post(msg: Message, bot):
                 await bot.delete_message(int(chat_id_str), msg_id)
                 deleted_count += 1
             except Exception as e:
-                logging.error(f"❌ Post nusxasini o‘chirishda xato: {e}")
+                logging.error(f"❌ Post nusxasini o'chirishda xato: {e}")
 
-    # 3️⃣ Mapping'dan o‘chirish
+    # 3️⃣ Mapping'dan o'chirish
     fresh_mapping = await load_mapping()
     if post_id in fresh_mapping:
         del fresh_mapping[post_id]
         await save_mapping(fresh_mapping)
 
     await msg.answer(f"✅ {deleted_count} ta xabar o'chirildi!")
+
+# Environment ma'lumotlari (faqat owner uchun)
+@router.message(Command("env_info"))
+async def cmd_env_info(msg: Message, bot):
+    """Environment ma'lumotlari - faqat owner uchun"""
+    if msg.from_user.id != BOT_OWNER_ID:
+        return
+    
+    # Faqat bot owner ko'ra oladi
+    env_debug = os.getenv("DEBUG", "false").lower() == "true"
+    
+    text = f"🔧 <b>Environment Info</b>\n\n"
+    text += f"📊 <b>Versiya:</b> {BOT_VERSION}\n"
+    text += f"🔍 <b>Debug:</b> {env_debug}\n"
+    text += f"📁 <b>Model kanallar:</b> {len(MODEL_CHANNEL_MAP)} ta\n"
+    text += f"📢 <b>Umumiy kanallar:</b> {len(ALWAYS_SEND_TO)} ta\n"
+    text += f"🏠 <b>Asosiy kanal:</b> <code>{MAIN_CHANNEL_ID}</code>\n"
+    text += f"👑 <b>Owner ID:</b> <code>{BOT_OWNER_ID}</code>\n"
+    
+    if env_debug:
+        text += f"\n🔧 <b>DEBUG ma'lumotlari:</b>\n"
+        text += f"MODEL_CHANNEL_MAP: {MODEL_CHANNEL_MAP}\n"
+        text += f"ALWAYS_SEND_TO: {ALWAYS_SEND_TO}"
+    
+    await msg.answer(text)
